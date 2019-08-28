@@ -2,9 +2,9 @@ package extension
 
 import (
 	"context"
+	"k8s.io/api/apps/v1"
 
 	"go.uber.org/zap"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -28,7 +28,7 @@ type Extension interface {
 	// decoded payloads from the kubeapi server.
 	//
 	// The manager will attempt to decode a pod from the request if possible and passes it to the Manager.
-	Handle(context.Context, Manager, *corev1.Pod, types.Request) types.Response
+	Handle(context.Context, Manager, *v1.StatefulSet, types.Request) types.Response
 }
 
 // Watcher is the Eirini Watcher Extension interface.

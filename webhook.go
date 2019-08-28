@@ -3,10 +3,10 @@ package extension
 import (
 	"context"
 	"fmt"
+	"k8s.io/api/apps/v1"
 
 	"github.com/pkg/errors"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,14 +36,14 @@ type DefaultMutatingWebhook struct {
 	setReference     setReferenceFunc
 }
 
-// GetPod retrieves a pod from a types.Request
-func (w *DefaultMutatingWebhook) GetPod(req types.Request) (*corev1.Pod, error) {
-	pod := &corev1.Pod{}
+// GetStatefulset retrieves a pod from a types.Request
+func (w *DefaultMutatingWebhook) GetStatefulset(req types.Request) (*v1.StatefulSet, error) {
+	statefulSet := &v1.StatefulSet{}
 	if w.decoder == nil {
 		return nil, errors.New("No decoder injected")
 	}
-	err := w.decoder.Decode(req, pod)
-	return pod, err
+	err := w.decoder.Decode(req, statefulSet)
+	return statefulSet, err
 }
 
 // WebhookOptions are the options required to register a WebHook to the WebHook server
@@ -86,7 +86,7 @@ func (w *DefaultMutatingWebhook) RegisterAdmissionWebHook(opts WebhookOptions) (
 		Path(fmt.Sprintf("/%s", opts.ID)).
 		Mutating().
 		NamespaceSelector(w.getNamespaceSelector(opts)).
-		ForType(&corev1.Pod{}).
+		ForType(&v1.StatefulSet{}).
 		Name(fmt.Sprintf("%s.%s.org", opts.ID, opts.ManagerOptions.OperatorFingerprint)).
 		Handlers(w).
 		WithManager(opts.Manager).
@@ -120,19 +120,19 @@ func (w *DefaultMutatingWebhook) InjectDecoder(d types.Decoder) error {
 // Handle delegates the Handle function to the Eirini Extension
 func (w *DefaultMutatingWebhook) Handle(ctx context.Context, req types.Request) types.Response {
 
-	pod, _ := w.GetPod(req)
+	statefulSet, _ := w.GetStatefulset(req)
 
 	// Don't filter the pod if We are not handling pods or filtering is disabled
-	if pod == nil || !w.FilterEiriniApps {
-		return w.EiriniExtension.Handle(ctx, w.EiriniExtensionManager, pod, req)
+	if statefulSet == nil || !w.FilterEiriniApps {
+		return w.EiriniExtension.Handle(ctx, w.EiriniExtensionManager, statefulSet, req)
 	}
 
-	podCopy := pod.DeepCopy()
+	podCopy := statefulSet.DeepCopy()
 
 	// Patch only applications pod created by Eirini
-	if v, ok := pod.GetLabels()["source_type"]; ok && v == "APP" {
-		return w.EiriniExtension.Handle(ctx, w.EiriniExtensionManager, pod, req)
+	if v, ok := statefulSet.GetLabels()["source_type"]; ok && v == "APP" {
+		return w.EiriniExtension.Handle(ctx, w.EiriniExtensionManager, statefulSet, req)
 	}
 
-	return admission.PatchResponse(pod, podCopy)
+	return admission.PatchResponse(statefulSet, podCopy)
 }
